@@ -10,7 +10,7 @@ import streamlit as st
 
 APP_DIR = Path(__file__).parent
 FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
-DEFAULT_RECIPIENT = "em yêu"
+DEFAULT_RECIPIENT = "em bé yêu"
 DEFAULT_SENDER = "anh"
 DEFAULT_MESSAGE = (
     "Cảm ơn em vì đã bước vào cuộc đời anh và làm cho những ngày bình thường "
@@ -20,11 +20,11 @@ DEFAULT_MESSAGE = (
 )
 
 
-def build_heart_particles() -> str:
-    particles = []
-    particle_count = 108
-    for index in range(particle_count):
-        angle = (index / particle_count) * math.tau
+def build_flower_heart() -> str:
+    flowers = []
+    flower_count = 138
+    for index in range(flower_count):
+        angle = (index / flower_count) * math.tau
         layer = 0.82 + (index % 4) * 0.06
         x = 50 + 47 * layer * math.sin(angle) ** 3
         y = 47 - 41 * layer * (
@@ -33,14 +33,15 @@ def build_heart_particles() -> str:
             - 2 * math.cos(3 * angle)
             - math.cos(4 * angle)
         ) / 17
-        size = 3 + (index % 5)
-        delay = (index % 18) * -0.12
-        drift = 4 + (index % 5)
-        particles.append(
-            f'<i style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size}px;'
-            f'--delay:{delay:.2f}s;--drift:{drift}px"></i>'
+        size = 13 + (index % 6) * 2
+        delay = (index % 24) * -0.11
+        drift = 5 + (index % 7)
+        rotation = (index * 29) % 360
+        flowers.append(
+            f'<i class="flower" style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size}px;'
+            f'--delay:{delay:.2f}s;--drift:{drift}px;--rotation:{rotation}deg"></i>'
         )
-    return "".join(particles)
+    return "".join(flowers)
 
 
 def setup_page() -> None:
@@ -103,19 +104,28 @@ def setup_page() -> None:
         .sparkles::before, .sparkles::after { content: '✦  ✧  ✦  ✧  ✦'; position: absolute;
             color: #ffb0ce; letter-spacing: 2.5rem; animation: sparkle 2s ease-in-out infinite alternate; }
         .sparkles::before { top: 13%; left: 3%; } .sparkles::after { right: 2%; bottom: 16%; animation-delay: 1s; }
-        .particle-heart {
-            position: relative; width: min(96vw, 560px); height: 370px; margin: .2rem auto 1.1rem;
-            filter: drop-shadow(0 0 18px rgba(255, 64, 131, .78)) drop-shadow(0 0 38px rgba(255, 152, 195, .5));
+        .flower-heart {
+            position: relative; width: min(98vw, 700px); height: 480px; margin: -.2rem auto .8rem;
+            filter: drop-shadow(0 0 22px rgba(255, 64, 131, .82)) drop-shadow(0 0 48px rgba(255, 152, 195, .65));
         }
-        .particle-heart i {
+        .flower-heart .flower {
             position: absolute; left: var(--x); top: var(--y); width: var(--size); height: var(--size);
-            border-radius: 50%; background: #fff; box-shadow: 0 0 5px #fff, 0 0 12px #ff3f89, 0 0 22px #ff8db6;
-            animation: heart-particle 1.8s ease-in-out var(--delay) infinite alternate, particle-twinkle 1.1s ease-in-out var(--delay) infinite;
+            border-radius: 50%; transform: rotate(var(--rotation));
+            background:
+                radial-gradient(ellipse at 50% 17%, #fff 0 23%, transparent 25%),
+                radial-gradient(ellipse at 83% 42%, #ffb1cb 0 25%, transparent 27%),
+                radial-gradient(ellipse at 67% 82%, #ff5c91 0 25%, transparent 27%),
+                radial-gradient(ellipse at 33% 82%, #ff7eaa 0 25%, transparent 27%),
+                radial-gradient(ellipse at 17% 42%, #ffb1cb 0 25%, transparent 27%),
+                radial-gradient(circle, #ffd86e 0 14%, transparent 16%);
+            filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 9px #ff4e89);
+            animation: flower-dance 2.1s ease-in-out var(--delay) infinite alternate,
+                flower-twinkle 1.35s ease-in-out var(--delay) infinite;
         }
-        .particle-heart::after {
+        .flower-heart::after {
             content: '✨'; position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
-            font-size: 2.6rem; opacity: .95; text-shadow: 0 0 12px #fff, 0 0 26px #ff3f89;
-            animation: sparkle .8s ease-in-out infinite alternate;
+            font-size: 3.6rem; opacity: .98; text-shadow: 0 0 14px #fff, 0 0 32px #ff3f89, 0 0 55px #ffb0ce;
+            animation: sparkle .7s ease-in-out infinite alternate;
         }
         .stApp > header, .block-container { position: relative; z-index: 1; }
         div.stButton > button {
@@ -129,15 +139,15 @@ def setup_page() -> None:
             12% { opacity: .9; } 80% { opacity: .75; } 100% { transform: translateY(-115vh) rotate(35deg) scale(1.25); opacity: 0; } }
         @keyframes sparkle { from { opacity: .25; transform: scale(.8) rotate(-8deg); } to { opacity: 1; transform: scale(1.15) rotate(8deg); } }
         @keyframes image-glow { from { box-shadow: 0 12px 35px rgba(167,20,85,.22); } to { box-shadow: 0 12px 45px rgba(255,63,120,.5); } }
-        @keyframes heart-particle {
-            0% { transform: translate(calc(var(--drift) * -1), 8px) scale(.35); opacity: .2; }
-            35% { transform: translate(var(--drift), -12px) scale(1.5); opacity: 1; }
-            70% { transform: translate(calc(var(--drift) * -1), 4px) scale(.75); opacity: .6; }
-            100% { transform: translate(var(--drift), -6px) scale(1.15); opacity: .95; }
+        @keyframes flower-dance {
+            0% { transform: translate(calc(var(--drift) * -1), 10px) rotate(var(--rotation)) scale(.55); opacity: .3; }
+            35% { transform: translate(var(--drift), -15px) rotate(calc(var(--rotation) + 18deg)) scale(1.3); opacity: 1; }
+            70% { transform: translate(calc(var(--drift) * -1), 5px) rotate(calc(var(--rotation) - 14deg)) scale(.82); opacity: .68; }
+            100% { transform: translate(var(--drift), -9px) rotate(calc(var(--rotation) + 28deg)) scale(1.12); opacity: .96; }
         }
-        @keyframes particle-twinkle {
-            0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(2.2); }
+        @keyframes flower-twinkle {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 3px #fff) drop-shadow(0 0 8px #ff4e89); }
+            50% { filter: brightness(1.9) drop-shadow(0 0 7px #fff) drop-shadow(0 0 18px #ff4e89); }
         }
         </style>
         <div class="heart-field"><span>♥</span><span>♡</span><span>♥</span><span>❤</span><span>♡</span><span>♥</span></div>
@@ -237,8 +247,8 @@ def render_welcome() -> None:
         f'<section class="hero"><div style="font-size:2.8rem;animation:sparkle 1.4s infinite alternate">💖 ✨ 💖</div>'
         '<h1>Món Quà Nhỏ Dành Cho Em</h1>'
         '<p>🌹 Một lời chúc trang trọng, được viết riêng bằng tất cả yêu thương 🌹</p>'
-        f'<div class="particle-heart" aria-label="Trái tim tạo từ những hạt sáng">{build_heart_particles()}</div>'
-        '<p style="font-size:.9rem;color:#c21d60;font-weight:600">Trái tim anh được tạo từ những hạt sáng dành cho em ✨</p>'
+        f'<div class="flower-heart" aria-label="Trái tim tạo từ những cánh hoa">{build_flower_heart()}</div>'
+        '<p style="font-size:.9rem;color:#c21d60;font-weight:600">Trái tim anh được kết thành từ những cánh hoa rực rỡ dành cho em 🌸✨</p>'
         f"{image_html}</section>",
         unsafe_allow_html=True,
     )
