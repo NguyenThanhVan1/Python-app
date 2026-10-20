@@ -1,7 +1,3 @@
-# Buildozer
-.buildozer/
-bin/
-
 # Python
 __pycache__/
 *.py[cod]
