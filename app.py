@@ -2,6 +2,7 @@
 
 import base64
 from datetime import date
+import hashlib
 from html import escape
 import math
 from pathlib import Path
@@ -11,6 +12,7 @@ import streamlit as st
 
 APP_DIR = Path(__file__).parent
 FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
+ALBUM_DIR = APP_DIR / "album"
 DEFAULT_RECIPIENT = "em bé yêu"
 DEFAULT_SENDER = "anh"
 DEFAULT_MESSAGE = (
@@ -220,6 +222,12 @@ def initialize_state() -> None:
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
+    if not st.session_state.photos:
+        st.session_state.photos = sorted(
+            ALBUM_DIR.glob("*"),
+            key=lambda photo: photo.stat().st_mtime,
+            reverse=True,
+        ) if ALBUM_DIR.exists() else []
     if not st.session_state.gift_opened:
         st.session_state.page = "welcome"
 
@@ -230,6 +238,22 @@ def go_to(page: str) -> None:
 
 def today_message() -> str:
     return DAILY_MESSAGES[date.today().toordinal() % len(DAILY_MESSAGES)]
+
+
+def save_uploaded_photos(uploaded_photos: list) -> list[Path]:
+    ALBUM_DIR.mkdir(exist_ok=True)
+    saved_photos = list(st.session_state.photos)
+    existing_names = {photo.name for photo in saved_photos if isinstance(photo, Path)}
+    for photo in uploaded_photos:
+        content = photo.getvalue()
+        digest = hashlib.sha256(content).hexdigest()[:16]
+        suffix = Path(photo.name).suffix.lower()
+        saved_path = ALBUM_DIR / f"{digest}{suffix}"
+        if saved_path.name not in existing_names:
+            saved_path.write_bytes(content)
+            saved_photos.append(saved_path)
+            existing_names.add(saved_path.name)
+    return saved_photos
 
 
 def letter_text() -> str:
@@ -421,7 +445,8 @@ def render_album() -> None:
     st.caption("Thêm những khoảnh khắc khiến em mỉm cười nhé")
     uploaded = st.file_uploader("Thêm ảnh từ thiết bị", type=["png", "jpg", "jpeg", "gif", "bmp"], accept_multiple_files=True)
     if uploaded:
-        st.session_state.photos = uploaded
+        st.session_state.photos = save_uploaded_photos(uploaded)
+        st.success("Đã lưu ảnh vào album 💾")
     photos = st.session_state.photos
     if photos:
         st.success(f"Album đã có {len(photos)} ảnh kỷ niệm 💕")
