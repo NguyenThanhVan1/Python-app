@@ -1,6 +1,7 @@
 """Món quà 20/10 - phiên bản web Streamlit."""
 
 import base64
+from datetime import date
 from html import escape
 import math
 from pathlib import Path
@@ -17,6 +18,20 @@ DEFAULT_MESSAGE = (
     "trở nên ấm áp, ý nghĩa hơn. Anh chúc em luôn giữ được sự dịu dàng, bản lĩnh "
     "và niềm tin vào những điều tốt đẹp; mong mọi ước mơ của em đều từng bước "
     "trở thành hiện thực."
+)
+DAILY_MESSAGES = (
+    "Hôm nay em đã mỉm cười chưa? Nếu chưa, mong lời nhắn này sẽ mang đến cho em một chút ấm áp.",
+    "Em xứng đáng với tất cả những điều dịu dàng, tử tế và rực rỡ nhất trên thế gian.",
+    "Cảm ơn em vì đã làm thế giới của anh trở nên đẹp hơn chỉ bằng sự hiện diện của mình.",
+    "Mong hôm nay của em thật bình an, và mỗi ngày phía trước đều có thêm một điều đáng mong chờ.",
+    "Dù hôm nay có bận rộn hay mệt mỏi, xin em hãy nhớ rằng em luôn rất đáng quý và được yêu thương.",
+)
+LOVE_REASONS = (
+    ("Nụ cười của em", "Nụ cười của em luôn khiến những ngày bình thường trở nên sáng trong và đáng nhớ hơn."),
+    ("Sự dịu dàng của em", "Sự dịu dàng em dành cho mọi người khiến anh càng thêm trân trọng trái tim ấm áp của em."),
+    ("Cách em quan tâm mọi người", "Em luôn để ý đến cảm xúc của người khác bằng một sự tinh tế và chân thành thật đẹp."),
+    ("Sự ân cần chu đáo", "Những điều em làm tuy nhỏ bé nhưng luôn khiến người bên cạnh cảm thấy được yêu thương."),
+    ("Những điều em làm mỗi ngày", "Chính những khoảnh khắc giản dị ấy tạo nên một em rất riêng, rất đáng quý trong lòng anh."),
 )
 
 
@@ -63,6 +78,37 @@ def setup_page() -> None:
                 linear-gradient(135deg, #fff7f9 0%, #ffe0ec 48%, #ffd0e5 100%);
             color: var(--ink);
         }
+        .opening-stage {
+            min-height: 62vh; display: grid; place-items: center; text-align: center;
+            margin: -1rem -1rem 1rem; padding: 2rem 1rem;
+            border-radius: 32px; background: radial-gradient(circle, #42132f 0%, #190d22 68%, #0d0917 100%);
+            box-shadow: inset 0 0 80px rgba(255, 63, 120, .12), 0 18px 55px rgba(80, 9, 50, .3);
+        }
+        .gift-box {
+            position: relative; width: min(70vw, 280px); height: 220px; margin: 1rem auto 2rem;
+            animation: gift-breathe 2.1s ease-in-out infinite;
+        }
+        .gift-body { position: absolute; bottom: 0; left: 8%; width: 84%; height: 62%;
+            border-radius: 8px 8px 18px 18px; background: linear-gradient(135deg, #f72e72, #9d1458);
+            box-shadow: 0 15px 35px rgba(255, 40, 121, .4); }
+        .gift-lid { position: absolute; z-index: 2; top: 22%; left: 3%; width: 94%; height: 25%;
+            border-radius: 10px; background: linear-gradient(135deg, #ff6793, #c51b65);
+            transform-origin: 15% 90%; animation: lid-float 2.1s ease-in-out infinite; }
+        .gift-ribbon-v { position: absolute; z-index: 3; left: 43%; top: 20%; width: 14%; height: 73%; background: #ffd66e; }
+        .gift-ribbon-h { position: absolute; z-index: 3; left: 8%; top: 40%; width: 84%; height: 13%; background: #ffd66e; }
+        .gift-bow { position: absolute; z-index: 4; top: 3%; left: 33%; width: 34%; height: 30%; }
+        .gift-bow::before, .gift-bow::after { content: ''; position: absolute; width: 55%; height: 70%;
+            background: #ffe285; border: 3px solid #f5b94f; border-radius: 70% 20% 70% 20%; }
+        .gift-bow::before { left: 0; transform: rotate(-25deg); } .gift-bow::after { right: 0; transform: rotate(25deg) scaleX(-1); }
+        .gift-bow { background: radial-gradient(circle, #f5b94f 0 22%, transparent 24%); }
+        .opening-stage h1, .opening-stage p { color: #fff0f7; }
+        .opening-stage h1 { font-family: 'Pacifico', cursive; color: #ffb8d2; }
+        .celebration { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+        .celebration span { position: absolute; top: -40px; font-size: 2rem; animation: fall 4.8s linear infinite; }
+        .celebration span:nth-child(1) { left: 8%; animation-delay: 0s; } .celebration span:nth-child(2) { left: 22%; animation-delay: 1.1s; }
+        .celebration span:nth-child(3) { left: 39%; animation-delay: .5s; } .celebration span:nth-child(4) { left: 57%; animation-delay: 1.8s; }
+        .celebration span:nth-child(5) { left: 76%; animation-delay: .8s; } .celebration span:nth-child(6) { left: 91%; animation-delay: 2.2s; }
+        .reason-card { text-align: center; min-height: 140px; display: grid; place-items: center; }
         .stApp, .stApp button, .stApp input, .stApp textarea {
             font-family: 'Be Vietnam Pro', sans-serif;
         }
@@ -139,6 +185,9 @@ def setup_page() -> None:
             12% { opacity: .9; } 80% { opacity: .75; } 100% { transform: translateY(-115vh) rotate(35deg) scale(1.25); opacity: 0; } }
         @keyframes sparkle { from { opacity: .25; transform: scale(.8) rotate(-8deg); } to { opacity: 1; transform: scale(1.15) rotate(8deg); } }
         @keyframes image-glow { from { box-shadow: 0 12px 35px rgba(167,20,85,.22); } to { box-shadow: 0 12px 45px rgba(255,63,120,.5); } }
+        @keyframes gift-breathe { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.04) rotate(-1deg); } }
+        @keyframes lid-float { 0%, 100% { transform: rotate(0) translateY(0); } 50% { transform: rotate(-8deg) translate(-8px, -18px); } }
+        @keyframes fall { 0% { transform: translateY(-50px) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(110vh) rotate(540deg); opacity: 0; } }
         @keyframes flower-dance {
             0% { transform: translate(calc(var(--drift) * -1), 10px) rotate(var(--rotation)) scale(.55); opacity: .3; }
             35% { transform: translate(var(--drift), -15px) rotate(calc(var(--rotation) + 18deg)) scale(1.3); opacity: 1; }
@@ -164,13 +213,23 @@ def initialize_state() -> None:
         "sender": DEFAULT_SENDER,
         "custom_message": DEFAULT_MESSAGE,
         "photos": [],
+        "gift_opened": False,
+        "reason_index": 0,
+        "secret_unlocked": False,
+        "daily_message": "",
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
+    if not st.session_state.gift_opened:
+        st.session_state.page = "welcome"
 
 
 def go_to(page: str) -> None:
     st.session_state.page = page
+
+
+def today_message() -> str:
+    return DAILY_MESSAGES[date.today().toordinal() % len(DAILY_MESSAGES)]
 
 
 def letter_text() -> str:
@@ -231,7 +290,16 @@ def render_settings() -> None:
 
 
 def render_navigation() -> None:
-    labels = {"welcome": "🏠 Trang đầu", "letter": "💌 Bức thư", "secret": "✨ Điều muốn nói", "album": "📷 Album", "ending": "🌷 Lời kết"}
+    labels = {
+        "welcome": "🏠 Trang đầu",
+        "letter": "💌 Bức thư",
+        "reasons": "💖 Điều anh yêu",
+        "secret": "🔐 Thư bí mật",
+        "album": "📷 Album",
+        "ending": "🌷 Lời kết",
+    }
+    if not st.session_state.gift_opened:
+        labels = {"welcome": "🎁 Mở quà"}
     selected = st.radio("Đi đến", list(labels), format_func=labels.get, index=list(labels).index(st.session_state.page), horizontal=True, label_visibility="collapsed")
     if selected != st.session_state.page:
         go_to(selected)
@@ -239,6 +307,20 @@ def render_navigation() -> None:
 
 
 def render_welcome() -> None:
+    if not st.session_state.gift_opened:
+        st.markdown(
+            '<section class="opening-stage"><div><div style="font-size:1.1rem;letter-spacing:.18rem">✨ MỘT BẤT NGỜ NHỎ DÀNH RIÊNG CHO EM ✨</div>'
+            '<h1>Hãy mở món quà này nhé</h1><div class="gift-box"><div class="gift-bow"></div><div class="gift-lid"></div>'
+            '<div class="gift-body"></div><div class="gift-ribbon-v"></div><div class="gift-ribbon-h"></div></div>'
+            '<p>Trong chiếc hộp này là một trái tim và những lời yêu thương anh muốn gửi đến em.</p></div></section>',
+            unsafe_allow_html=True,
+        )
+        if st.button("🎁 CHẠM ĐỂ MỞ QUÀ ✨", type="primary", use_container_width=True):
+            st.session_state.gift_opened = True
+            st.balloons()
+            st.rerun()
+        return
+
     image_html = ""
     if FEATURED_IMAGE.exists():
         encoded_image = base64.b64encode(FEATURED_IMAGE.read_bytes()).decode("ascii")
@@ -253,12 +335,25 @@ def render_welcome() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(
+        '<div class="celebration"><span>🌹</span><span>🌸</span><span>💖</span><span>🌷</span><span>✨</span><span>🌺</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
         f'<div class="gift-card" style="text-align:center">Món quà này dành riêng cho '
         f'<b>{escape(st.session_state.recipient)}</b> — người đặc biệt nhất trong tim anh 💞</div>',
         unsafe_allow_html=True,
     )
     st.write("")
-    if st.button("🎁 MỞ QUÀ NGAY ✨", type="primary", use_container_width=True):
+    if st.button("💌 Nhận một lời nhắn hôm nay", use_container_width=True):
+        st.session_state.daily_message = today_message()
+    if st.session_state.daily_message:
+        st.markdown(
+            f'<div class="gift-card" style="text-align:center"><b>Lời nhắn dành cho em hôm nay</b><br><br>'
+            f'“{escape(st.session_state.daily_message)}”</div>',
+            unsafe_allow_html=True,
+        )
+    st.write("")
+    if st.button("💌 ĐỌC LỜI YÊU THƯƠNG ✨", type="primary", use_container_width=True):
         go_to("letter")
         st.rerun()
 
@@ -269,8 +364,8 @@ def render_letter() -> None:
     st.markdown(f'<div class="gift-card">{escape(letter_text()).replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
     first, second = st.columns(2)
     with first:
-        if st.button("✨ Điều anh muốn nói…", use_container_width=True):
-            go_to("secret")
+        if st.button("💖 Những điều anh yêu ở em", use_container_width=True):
+            go_to("reasons")
             st.rerun()
     with second:
         if st.button("📷 Album kỷ niệm", use_container_width=True):
@@ -278,13 +373,42 @@ def render_letter() -> None:
             st.rerun()
 
 
+def render_reasons() -> None:
+    st.header("💖 Những điều anh yêu ở em")
+    st.caption("Mỗi lần bấm, một điều dịu dàng khác sẽ được mở ra.")
+    title, message = LOVE_REASONS[st.session_state.reason_index]
+    st.markdown(
+        f'<div class="gift-card reason-card"><div><div style="font-size:3rem">🌸</div>'
+        f'<h3>{escape(title)}</h3><p>{escape(message)}</p></div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("🌷 Mở thêm một điều anh yêu", use_container_width=True):
+        st.session_state.reason_index = (st.session_state.reason_index + 1) % len(LOVE_REASONS)
+        st.rerun()
+    if st.button("🔐 Mở hộp thư bí mật", use_container_width=True):
+        go_to("secret")
+        st.rerun()
+
+
 def render_secret() -> None:
-    st.header("✨ Điều anh muốn nói…")
+    st.header("🔐 Hộp thư bí mật")
+    if not st.session_state.secret_unlocked:
+        st.markdown('<div class="gift-card">Lá thư này chỉ mở ra khi em nhập đúng mật mã riêng của món quà 💌</div>', unsafe_allow_html=True)
+        with st.form("secret_form"):
+            password = st.text_input("Mật mã", type="password", placeholder="Gợi ý: 4 chữ số đặc biệt")
+            unlock = st.form_submit_button("🔓 Mở lá thư", use_container_width=True)
+        if unlock:
+            if password == "1708":
+                st.session_state.secret_unlocked = True
+                st.rerun()
+            st.error("Mật mã chưa đúng, em thử lại nhé 💗")
+        return
     st.markdown(
         '<div class="gift-card">Nếu có một điều anh muốn em luôn nhớ, thì đó là:<br><br>'
         "Em không cần phải trở thành ai khác để được yêu thương. Em của hiện tại "
-        "đã rất đáng quý rồi. Cảm ơn em vì đã là chính em và vì đã cho anh cơ hội "
-        "được đồng hành cùng em. 💗</div>",
+        "đã rất đáng quý rồi. Cảm ơn em vì đã là chính em, vì những cố gắng thầm lặng "
+        "và vì đã cho anh cơ hội được đồng hành cùng em. Dù ngày mai có ra sao, anh "
+        "vẫn mong em luôn tin vào giá trị của mình và bước đi thật kiêu hãnh. 💗</div>",
         unsafe_allow_html=True,
     )
     if st.button("Mở album kỷ niệm 📷", use_container_width=True):
@@ -331,7 +455,14 @@ def main() -> None:
     initialize_state()
     render_settings()
     render_navigation()
-    pages = {"welcome": render_welcome, "letter": render_letter, "secret": render_secret, "album": render_album, "ending": render_ending}
+    pages = {
+        "welcome": render_welcome,
+        "letter": render_letter,
+        "reasons": render_reasons,
+        "secret": render_secret,
+        "album": render_album,
+        "ending": render_ending,
+    }
     pages[st.session_state.page]()
 
 
