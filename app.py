@@ -91,6 +91,10 @@ def setup_page() -> None:
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Pacifico&display=swap');
         :root { --pink: #ff3f78; --deep: #a71455; --ink: #702044; }
+        header[data-testid="stHeader"] { display: none; }
+        [data-testid="stToolbar"] { display: none; }
+        [data-testid="stAppDeployButton"] { display: none !important; }
+        #MainMenu, footer { visibility: hidden; }
         .stApp {
             background:
                 radial-gradient(circle at 8% 12%, #fff 0 3%, transparent 20%),
