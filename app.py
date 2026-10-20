@@ -385,23 +385,7 @@ def render_welcome() -> None:
         f'<b>{escape(st.session_state.recipient)}</b> — người đặc biệt nhất trong tim anh 💞</div>',
         unsafe_allow_html=True,
     )
-    st.markdown(
-        '<div class="gift-card" style="text-align:center">'
-        "<h3>📱 Quét mã QR để mở món quà trên web</h3>"
-        "<p>Dùng camera điện thoại để quét và truy cập nhanh vào trang quà này.</p>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    qr_column, _ = st.columns([1, 1])
-    with qr_column:
-        st.image(build_web_app_qr(), caption="Mã QR mở trang web", use_container_width=True)
-        st.download_button(
-            "⬇️ Tải mã QR",
-            data=build_web_app_qr(),
-            file_name="ma-qr-mon-qua.png",
-            mime="image/png",
-            use_container_width=True,
-        )
+    
     st.write("")
     if st.button("💌 Nhận một lời nhắn hôm nay", use_container_width=True):
         st.session_state.daily_message = today_message()
