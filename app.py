@@ -4,9 +4,11 @@ import base64
 from datetime import date
 import hashlib
 from html import escape
+from io import BytesIO
 import math
 from pathlib import Path
 
+import qrcode
 import streamlit as st
 
 
@@ -15,6 +17,7 @@ FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
 ALBUM_DIR = APP_DIR / "album"
 DEFAULT_RECIPIENT = "em bé yêu"
 DEFAULT_SENDER = "anh"
+WEB_APP_URL = "https://python-app-yvizhlrbdgju5xsqc3wdwf.streamlit.app"
 DEFAULT_MESSAGE = (
     "Cảm ơn em vì đã bước vào cuộc đời anh và làm cho những ngày bình thường "
     "trở nên ấm áp, ý nghĩa hơn. Anh chúc em luôn giữ được sự dịu dàng, bản lĩnh "
@@ -35,6 +38,21 @@ LOVE_REASONS = (
     ("Sự ân cần chu đáo", "Những điều em làm tuy nhỏ bé nhưng luôn khiến người bên cạnh cảm thấy được yêu thương."),
     ("Những điều em làm mỗi ngày", "Chính những khoảnh khắc giản dị ấy tạo nên một em rất riêng, rất đáng quý trong lòng anh."),
 )
+
+
+@st.cache_data
+def build_web_app_qr() -> bytes:
+    qr = qrcode.QRCode(
+        box_size=10,
+        border=4,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+    )
+    qr.add_data(WEB_APP_URL)
+    qr.make(fit=True)
+    image = qr.make_image(fill_color="#a71455", back_color="white")
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 def build_flower_heart() -> str:
@@ -367,6 +385,23 @@ def render_welcome() -> None:
         f'<b>{escape(st.session_state.recipient)}</b> — người đặc biệt nhất trong tim anh 💞</div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div class="gift-card" style="text-align:center">'
+        "<h3>📱 Quét mã QR để mở món quà trên web</h3>"
+        "<p>Dùng camera điện thoại để quét và truy cập nhanh vào trang quà này.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    qr_column, _ = st.columns([1, 1])
+    with qr_column:
+        st.image(build_web_app_qr(), caption="Mã QR mở trang web", use_container_width=True)
+        st.download_button(
+            "⬇️ Tải mã QR",
+            data=build_web_app_qr(),
+            file_name="ma-qr-mon-qua.png",
+            mime="image/png",
+            use_container_width=True,
+        )
     st.write("")
     if st.button("💌 Nhận một lời nhắn hôm nay", use_container_width=True):
         st.session_state.daily_message = today_message()
