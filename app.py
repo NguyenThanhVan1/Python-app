@@ -2,6 +2,7 @@
 
 import base64
 from html import escape
+import math
 from pathlib import Path
 
 import streamlit as st
@@ -15,6 +16,26 @@ DEFAULT_MESSAGE = (
     "Cảm ơn em vì đã đến bên anh. Chỉ cần em luôn vui vẻ, bình an và "
     "mỉm cười, với anh đó đã là một điều thật tuyệt vời."
 )
+
+
+def build_heart_particles() -> str:
+    particles = []
+    for index in range(56):
+        angle = (index / 56) * math.tau
+        x = 50 + 43 * math.sin(angle) ** 3
+        y = 47 - 36 * (
+            13 * math.cos(angle)
+            - 5 * math.cos(2 * angle)
+            - 2 * math.cos(3 * angle)
+            - math.cos(4 * angle)
+        ) / 17
+        size = 3 + (index % 4)
+        delay = (index % 14) * -0.16
+        particles.append(
+            f'<i style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size}px;'
+            f'--delay:{delay:.2f}s"></i>'
+        )
+    return "".join(particles)
 
 
 def setup_page() -> None:
@@ -77,6 +98,19 @@ def setup_page() -> None:
         .sparkles::before, .sparkles::after { content: '✦  ✧  ✦  ✧  ✦'; position: absolute;
             color: #ffb0ce; letter-spacing: 2.5rem; animation: sparkle 2s ease-in-out infinite alternate; }
         .sparkles::before { top: 13%; left: 3%; } .sparkles::after { right: 2%; bottom: 16%; animation-delay: 1s; }
+        .particle-heart {
+            position: relative; width: min(92vw, 390px); height: 255px; margin: 0 auto 1.1rem;
+            filter: drop-shadow(0 0 15px rgba(255, 64, 131, .62));
+        }
+        .particle-heart i {
+            position: absolute; left: var(--x); top: var(--y); width: var(--size); height: var(--size);
+            border-radius: 50%; background: #fff; box-shadow: 0 0 5px #fff, 0 0 12px #ff3f89, 0 0 22px #ff8db6;
+            animation: heart-particle 2.4s ease-in-out var(--delay) infinite alternate;
+        }
+        .particle-heart::after {
+            content: '✨'; position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
+            font-size: 1.8rem; opacity: .9; animation: sparkle 1.1s ease-in-out infinite alternate;
+        }
         .stApp > header, .block-container { position: relative; z-index: 1; }
         div.stButton > button {
             border: 0; border-radius: 999px; color: white; font-weight: 700;
@@ -89,6 +123,11 @@ def setup_page() -> None:
             12% { opacity: .9; } 80% { opacity: .75; } 100% { transform: translateY(-115vh) rotate(35deg) scale(1.25); opacity: 0; } }
         @keyframes sparkle { from { opacity: .25; transform: scale(.8) rotate(-8deg); } to { opacity: 1; transform: scale(1.15) rotate(8deg); } }
         @keyframes image-glow { from { box-shadow: 0 12px 35px rgba(167,20,85,.22); } to { box-shadow: 0 12px 45px rgba(255,63,120,.5); } }
+        @keyframes heart-particle {
+            0% { transform: translate(0, 0) scale(.45); opacity: .28; }
+            45% { transform: translate(3px, -8px) scale(1.25); opacity: 1; }
+            100% { transform: translate(-3px, 5px) scale(.75); opacity: .65; }
+        }
         </style>
         <div class="heart-field"><span>♥</span><span>♡</span><span>♥</span><span>❤</span><span>♡</span><span>♥</span></div>
         <div class="sparkles"></div>
@@ -176,6 +215,8 @@ def render_welcome() -> None:
         f'<section class="hero"><div style="font-size:2.8rem;animation:sparkle 1.4s infinite alternate">💖 ✨ 💖</div>'
         '<h1>Món Quà Nhỏ Dành Cho Em</h1>'
         '<p>🌹 Một bất ngờ rực rỡ, được viết riêng bằng tất cả yêu thương 🌹</p>'
+        f'<div class="particle-heart" aria-label="Trái tim tạo từ những hạt sáng">{build_heart_particles()}</div>'
+        '<p style="font-size:.9rem;color:#c21d60;font-weight:600">Trái tim anh được tạo từ những hạt sáng dành cho em ✨</p>'
         f"{image_html}</section>",
         unsafe_allow_html=True,
     )
