@@ -13,27 +13,32 @@ FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
 DEFAULT_RECIPIENT = "em yêu"
 DEFAULT_SENDER = "anh"
 DEFAULT_MESSAGE = (
-    "Cảm ơn em vì đã đến bên anh. Chỉ cần em luôn vui vẻ, bình an và "
-    "mỉm cười, với anh đó đã là một điều thật tuyệt vời."
+    "Cảm ơn em vì đã bước vào cuộc đời anh và làm cho những ngày bình thường "
+    "trở nên ấm áp, ý nghĩa hơn. Anh chúc em luôn giữ được sự dịu dàng, bản lĩnh "
+    "và niềm tin vào những điều tốt đẹp; mong mọi ước mơ của em đều từng bước "
+    "trở thành hiện thực."
 )
 
 
 def build_heart_particles() -> str:
     particles = []
-    for index in range(56):
-        angle = (index / 56) * math.tau
-        x = 50 + 43 * math.sin(angle) ** 3
-        y = 47 - 36 * (
+    particle_count = 108
+    for index in range(particle_count):
+        angle = (index / particle_count) * math.tau
+        layer = 0.82 + (index % 4) * 0.06
+        x = 50 + 47 * layer * math.sin(angle) ** 3
+        y = 47 - 41 * layer * (
             13 * math.cos(angle)
             - 5 * math.cos(2 * angle)
             - 2 * math.cos(3 * angle)
             - math.cos(4 * angle)
         ) / 17
-        size = 3 + (index % 4)
-        delay = (index % 14) * -0.16
+        size = 3 + (index % 5)
+        delay = (index % 18) * -0.12
+        drift = 4 + (index % 5)
         particles.append(
             f'<i style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size}px;'
-            f'--delay:{delay:.2f}s"></i>'
+            f'--delay:{delay:.2f}s;--drift:{drift}px"></i>'
         )
     return "".join(particles)
 
@@ -99,17 +104,18 @@ def setup_page() -> None:
             color: #ffb0ce; letter-spacing: 2.5rem; animation: sparkle 2s ease-in-out infinite alternate; }
         .sparkles::before { top: 13%; left: 3%; } .sparkles::after { right: 2%; bottom: 16%; animation-delay: 1s; }
         .particle-heart {
-            position: relative; width: min(92vw, 390px); height: 255px; margin: 0 auto 1.1rem;
-            filter: drop-shadow(0 0 15px rgba(255, 64, 131, .62));
+            position: relative; width: min(96vw, 560px); height: 370px; margin: .2rem auto 1.1rem;
+            filter: drop-shadow(0 0 18px rgba(255, 64, 131, .78)) drop-shadow(0 0 38px rgba(255, 152, 195, .5));
         }
         .particle-heart i {
             position: absolute; left: var(--x); top: var(--y); width: var(--size); height: var(--size);
             border-radius: 50%; background: #fff; box-shadow: 0 0 5px #fff, 0 0 12px #ff3f89, 0 0 22px #ff8db6;
-            animation: heart-particle 2.4s ease-in-out var(--delay) infinite alternate;
+            animation: heart-particle 1.8s ease-in-out var(--delay) infinite alternate, particle-twinkle 1.1s ease-in-out var(--delay) infinite;
         }
         .particle-heart::after {
             content: '✨'; position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
-            font-size: 1.8rem; opacity: .9; animation: sparkle 1.1s ease-in-out infinite alternate;
+            font-size: 2.6rem; opacity: .95; text-shadow: 0 0 12px #fff, 0 0 26px #ff3f89;
+            animation: sparkle .8s ease-in-out infinite alternate;
         }
         .stApp > header, .block-container { position: relative; z-index: 1; }
         div.stButton > button {
@@ -124,9 +130,14 @@ def setup_page() -> None:
         @keyframes sparkle { from { opacity: .25; transform: scale(.8) rotate(-8deg); } to { opacity: 1; transform: scale(1.15) rotate(8deg); } }
         @keyframes image-glow { from { box-shadow: 0 12px 35px rgba(167,20,85,.22); } to { box-shadow: 0 12px 45px rgba(255,63,120,.5); } }
         @keyframes heart-particle {
-            0% { transform: translate(0, 0) scale(.45); opacity: .28; }
-            45% { transform: translate(3px, -8px) scale(1.25); opacity: 1; }
-            100% { transform: translate(-3px, 5px) scale(.75); opacity: .65; }
+            0% { transform: translate(calc(var(--drift) * -1), 8px) scale(.35); opacity: .2; }
+            35% { transform: translate(var(--drift), -12px) scale(1.5); opacity: 1; }
+            70% { transform: translate(calc(var(--drift) * -1), 4px) scale(.75); opacity: .6; }
+            100% { transform: translate(var(--drift), -6px) scale(1.15); opacity: .95; }
+        }
+        @keyframes particle-twinkle {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(2.2); }
         }
         </style>
         <div class="heart-field"><span>♥</span><span>♡</span><span>♥</span><span>❤</span><span>♡</span><span>♥</span></div>
@@ -155,31 +166,42 @@ def go_to(page: str) -> None:
 def letter_text() -> str:
     return (
         f"{st.session_state.recipient} à,\n\n"
-        "Chúc em một ngày 20/10 thật vui vẻ, xinh đẹp và hạnh phúc. "
-        "Mong em luôn được yêu thương, trân trọng và có thật nhiều nụ cười.\n\n"
+        "Nhân ngày Phụ nữ Việt Nam 20/10, anh trân trọng gửi đến em những lời "
+        "chúc tốt đẹp và chân thành nhất. Chúc em luôn mạnh khỏe, bình an, tự tin "
+        "và hạnh phúc trên mọi chặng đường của cuộc sống. Mong rằng mỗi ngày mới "
+        "đều mang đến cho em một niềm vui, một cơ hội đẹp và thêm nhiều lý do để "
+        "mỉm cười.\n\n"
         f"{st.session_state.custom_message}\n\n"
-        "Anh không phải lúc nào cũng giỏi nói lời ngọt ngào, "
-        "nhưng anh luôn trân trọng những khoảnh khắc có em trong cuộc đời mình.\n\n"
+        "Anh không phải lúc nào cũng giỏi nói những lời hoa mỹ, nhưng anh luôn "
+        "trân trọng sự hiện diện của em và biết ơn từng khoảnh khắc được đồng hành "
+        "cùng em. Chúc cho những dự định, ước mơ và nỗ lực của em luôn được đền "
+        "đáp xứng đáng; và dù cuộc sống có đôi lúc thử thách, em vẫn luôn giữ "
+        "được trái tim ấm áp cùng ánh sáng riêng của mình.\n\n"
         f"Thương em nhiều,\n{st.session_state.sender} ❤️"
     )
 
 
 def ending_text() -> str:
     return (
-        f"Chúc {st.session_state.recipient} yêu của anh một ngày 20/10 thật vui vẻ "
-        "và hạnh phúc nhé ❤️🌷\n\n"
-        "Anh mong em sẽ luôn xinh đẹp, bình an, luôn mỉm cười và gặp thật nhiều "
-        "điều tốt đẹp trong cuộc sống. Anh biết đôi khi anh không phải là người "
-        "giỏi nói những lời ngọt ngào, nhưng anh muốn em biết rằng em là một "
-        "người rất đặc biệt đối với anh.\n\n"
-        "Cảm ơn em vì đã xuất hiện trong cuộc đời anh, vì những niềm vui, những "
-        "khoảnh khắc đáng nhớ và cả những điều nhỏ bé mà em mang đến mỗi ngày. "
-        "Anh không hứa sẽ khiến mọi ngày của em đều hoàn hảo, nhưng anh sẽ cố "
-        "gắng để khi em mệt mỏi, em có một người để sẻ chia; khi em buồn, em "
-        "có một người để dựa vào; và khi em hạnh phúc, anh sẽ luôn là người vui cùng em.\n\n"
-        "Mong rằng không chỉ riêng ngày 20/10 mà cả những ngày bình thường sau "
-        "này, em đều cảm nhận được mình được yêu thương, trân trọng và nâng niu. "
-        f"Anh thương em nhiều lắm! ❤️🥰\n\n— {st.session_state.sender}"
+        f"Nhân ngày Phụ nữ Việt Nam 20/10, anh kính chúc {st.session_state.recipient} "
+        "luôn dồi dào sức khỏe, giữ trong tim thật nhiều bình an và đón nhận mọi "
+        "điều tốt đẹp bằng nụ cười rạng rỡ nhất. Chúc em luôn tự tin theo đuổi "
+        "những điều mình yêu thích, đủ nghị lực trước mọi thử thách và đủ dịu dàng "
+        "để tận hưởng những niềm vui giản dị trong cuộc sống. ❤️🌷\n\n"
+        "Anh cảm ơn em vì đã xuất hiện, vì những khoảnh khắc đáng nhớ, vì sự ấm áp "
+        "và những điều nhỏ bé nhưng quý giá mà em đã mang đến mỗi ngày. Sự hiện "
+        "diện của em khiến cuộc sống trở nên nhiều màu sắc hơn, và với anh, em "
+        "luôn là một người đặc biệt, xứng đáng được yêu thương, tôn trọng và nâng niu.\n\n"
+        "Anh không dám hứa rằng mọi ngày phía trước sẽ luôn hoàn hảo, nhưng anh "
+        "mong mình có thể luôn chân thành, kiên nhẫn và đủ vững vàng để đồng hành "
+        "cùng em. Khi em mệt mỏi, mong em biết rằng em luôn có một người sẵn sàng "
+        "lắng nghe; khi em buồn, em có một bờ vai để sẻ chia; và khi em hạnh phúc, "
+        "anh sẽ luôn vui cùng em bằng tất cả sự tự hào và yêu thương.\n\n"
+        "Mong rằng không chỉ riêng ngày 20/10, mà trong tất cả những ngày bình "
+        "thường sau này, em đều cảm nhận được giá trị của bản thân và biết rằng "
+        "em xứng đáng với những điều tử tế nhất. Chúc em có một hành trình thật "
+        "đẹp, nhiều thành công, nhiều yêu thương và luôn giữ được ánh sáng rực "
+        f"rỡ trong tâm hồn. Anh thương em thật nhiều! ❤️🥰\n\n— {st.session_state.sender}"
     )
 
 
@@ -214,7 +236,7 @@ def render_welcome() -> None:
     st.markdown(
         f'<section class="hero"><div style="font-size:2.8rem;animation:sparkle 1.4s infinite alternate">💖 ✨ 💖</div>'
         '<h1>Món Quà Nhỏ Dành Cho Em</h1>'
-        '<p>🌹 Một bất ngờ rực rỡ, được viết riêng bằng tất cả yêu thương 🌹</p>'
+        '<p>🌹 Một lời chúc trang trọng, được viết riêng bằng tất cả yêu thương 🌹</p>'
         f'<div class="particle-heart" aria-label="Trái tim tạo từ những hạt sáng">{build_heart_particles()}</div>'
         '<p style="font-size:.9rem;color:#c21d60;font-weight:600">Trái tim anh được tạo từ những hạt sáng dành cho em ✨</p>'
         f"{image_html}</section>",
