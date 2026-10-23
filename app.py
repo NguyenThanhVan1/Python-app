@@ -2,6 +2,7 @@
 
 import base64
 from datetime import date, time
+from datetime import datetime
 import hashlib
 from html import escape
 from io import BytesIO
@@ -21,6 +22,7 @@ APP_DIR = Path(__file__).parent
 FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
 ALBUM_DIR = APP_DIR / "album"
 GITHUB_ALBUM_API = "https://api.github.com/repos/NguyenThanhVan1/Python-app/contents/album"
+GITHUB_MESSAGES_API = "https://api.github.com/repos/NguyenThanhVan1/Python-app/contents/messages.json"
 ALBUM_METADATA_NAME = "metadata.json"
 ALBUM_METADATA_PATH = ALBUM_DIR / ALBUM_METADATA_NAME
 DEFAULT_RECIPIENT = "em bé yêu"
@@ -250,6 +252,7 @@ def initialize_state() -> None:
         "reason_index": 0,
         "secret_unlocked": False,
         "daily_message": "",
+        "messages": [],
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -374,6 +377,49 @@ def save_metadata_to_github(metadata: dict[str, dict[str, str]]) -> None:
         payload["sha"] = existing["sha"]
     github_request(
         metadata_url,
+        method="PUT",
+        body=json.dumps(payload).encode("utf-8"),
+    )
+
+
+def load_messages_from_github() -> list[dict[str, str]]:
+    result = github_request(GITHUB_MESSAGES_API, allow_not_found=True)
+    if not result:
+        return []
+    if not isinstance(result, dict) or result.get("encoding") != "base64":
+        raise StorageError("Dữ liệu tin nhắn trên GitHub không hợp lệ.")
+    try:
+        messages = json.loads(
+            base64.b64decode(result["content"].replace("\n", "")).decode("utf-8")
+        )
+    except (ValueError, UnicodeDecodeError) as error:
+        raise StorageError("Không đọc được dữ liệu tin nhắn trên GitHub.") from error
+    if not isinstance(messages, list):
+        raise StorageError("Danh sách tin nhắn trên GitHub không hợp lệ.")
+    return [
+        {
+            "sender": str(message.get("sender", "Ẩn danh")),
+            "text": str(message.get("text", "")),
+            "created_at": str(message.get("created_at", "")),
+        }
+        for message in messages
+        if isinstance(message, dict) and message.get("text")
+    ]
+
+
+def save_messages_to_github(messages: list[dict[str, str]]) -> None:
+    existing = github_request(GITHUB_MESSAGES_API, allow_not_found=True)
+    payload = {
+        "message": "Update private messages",
+        "content": base64.b64encode(
+            json.dumps(messages, ensure_ascii=False, indent=2).encode("utf-8")
+        ).decode("ascii"),
+        "branch": github_setting("GITHUB_BRANCH", "main"),
+    }
+    if isinstance(existing, dict) and existing.get("sha"):
+        payload["sha"] = existing["sha"]
+    github_request(
+        GITHUB_MESSAGES_API,
         method="PUT",
         body=json.dumps(payload).encode("utf-8"),
     )
@@ -541,6 +587,7 @@ def render_navigation() -> None:
         "reasons": "💖 Điều anh yêu",
         "secret": "🔐 Thư bí mật",
         "album": "📷 Album",
+        "chat": "💬 Nhắn tin",
         "ending": "🌷 Lời kết",
     }
     if not st.session_state.gift_opened:
@@ -756,6 +803,48 @@ def render_album() -> None:
             st.rerun()
 
 
+def render_chat() -> None:
+    st.header("💬 Góc nhắn tin riêng")
+    st.caption("Tin nhắn được lưu bền vững trên GitHub. Bấm làm mới để xem tin mới.")
+    if not github_token():
+        st.warning("Cần cấu hình GITHUB_TOKEN để sử dụng chức năng nhắn tin.")
+        return
+    try:
+        messages = load_messages_from_github()
+        st.session_state.messages = messages
+    except StorageError as error:
+        st.error(f"Không thể tải tin nhắn: {error}")
+        return
+
+    if st.button("🔄 Làm mới tin nhắn", use_container_width=True):
+        st.rerun()
+    sender = st.text_input("Tên hiển thị", value=st.session_state.sender)
+    message = st.chat_input("Viết tin nhắn...")
+    if message and message.strip():
+        new_message = {
+            "sender": sender.strip() or DEFAULT_SENDER,
+            "text": message.strip(),
+            "created_at": datetime.now().astimezone().isoformat(timespec="minutes"),
+        }
+        try:
+            messages.append(new_message)
+            save_messages_to_github(messages)
+            st.session_state.messages = messages
+            st.rerun()
+        except StorageError as error:
+            st.error(f"Không thể gửi tin nhắn: {error}")
+
+    if not messages:
+        st.info("Chưa có tin nhắn nào. Hãy gửi lời nhắn đầu tiên 💌")
+        return
+    for item in messages:
+        with st.chat_message("user"):
+            st.markdown(f"**{escape(item['sender'])}**")
+            st.write(item["text"])
+            if item["created_at"]:
+                st.caption(item["created_at"])
+
+
 def render_ending() -> None:
     st.header("🌷 Dành riêng cho cô gái anh thương")
     st.markdown(f'<div class="gift-card">{escape(ending_text()).replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
@@ -775,6 +864,7 @@ def main() -> None:
         "reasons": render_reasons,
         "secret": render_secret,
         "album": render_album,
+        "chat": render_chat,
         "ending": render_ending,
     }
     pages[st.session_state.page]()
