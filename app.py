@@ -5,8 +5,12 @@ from datetime import date
 import hashlib
 from html import escape
 from io import BytesIO
+import json
 import math
+import os
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import qrcode
 import streamlit as st
@@ -15,6 +19,7 @@ import streamlit as st
 APP_DIR = Path(__file__).parent
 FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
 ALBUM_DIR = APP_DIR / "album"
+GITHUB_ALBUM_API = "https://api.github.com/repos/NguyenThanhVan1/Python-app/contents/album"
 DEFAULT_RECIPIENT = "em bé yêu"
 DEFAULT_SENDER = "anh"
 WEB_APP_URL = "https://python-app-yvizhlrbdgju5xsqc3wdwf.streamlit.app"
@@ -245,11 +250,11 @@ def initialize_state() -> None:
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
     if not st.session_state.photos:
-        st.session_state.photos = sorted(
-            ALBUM_DIR.glob("*"),
-            key=lambda photo: photo.stat().st_mtime,
-            reverse=True,
-        ) if ALBUM_DIR.exists() else []
+        try:
+            sync_album_from_github()
+        except StorageError as error:
+            st.session_state.album_storage_error = str(error)
+        st.session_state.photos = local_album_photos()
     if not st.session_state.gift_opened:
         st.session_state.page = "welcome"
 
@@ -262,6 +267,83 @@ def today_message() -> str:
     return DAILY_MESSAGES[date.today().toordinal() % len(DAILY_MESSAGES)]
 
 
+class StorageError(RuntimeError):
+    """An expected failure while reading or writing the persistent album."""
+
+
+def github_token() -> str:
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        token = st.secrets.get("GITHUB_TOKEN", "")
+    return token
+
+
+def github_request(url: str, method: str = "GET", **kwargs) -> dict | list:
+    token = github_token()
+    if not token:
+        raise StorageError(
+            "Chưa cấu hình GITHUB_TOKEN nên album chỉ được lưu tạm trên máy chủ."
+        )
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "python-app-album",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    body = kwargs.get("body")
+    request = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8")) if response.length else {}
+    except HTTPError as error:
+        if error.code == 404 and method == "GET" and url == GITHUB_ALBUM_API:
+            return []
+        raise StorageError(f"GitHub từ chối thao tác lưu album (HTTP {error.code}).") from error
+    except URLError as error:
+        raise StorageError("Không thể kết nối GitHub để lưu album.") from error
+
+
+def local_album_photos() -> list[Path]:
+    return sorted(
+        (photo for photo in ALBUM_DIR.glob("*") if photo.is_file()),
+        key=lambda photo: photo.stat().st_mtime,
+        reverse=True,
+    ) if ALBUM_DIR.exists() else []
+
+
+def sync_album_from_github() -> None:
+    if not github_token():
+        return
+    ALBUM_DIR.mkdir(exist_ok=True)
+    entries = github_request(GITHUB_ALBUM_API)
+    if not isinstance(entries, list):
+        raise StorageError("Phản hồi danh sách album từ GitHub không hợp lệ.")
+    for entry in entries:
+        if entry.get("type") != "file" or not entry.get("name"):
+            continue
+        content = github_request(entry["url"])
+        if not isinstance(content, dict) or content.get("encoding") != "base64":
+            raise StorageError(f"Không đọc được ảnh {entry['name']} từ GitHub.")
+        (ALBUM_DIR / entry["name"]).write_bytes(
+            base64.b64decode(content["content"].replace("\n", ""))
+        )
+
+
+def save_photo_to_github(saved_path: Path, content: bytes) -> None:
+    encoded = base64.b64encode(content).decode("ascii")
+    github_request(
+        f"{GITHUB_ALBUM_API}/{saved_path.name}",
+        method="PUT",
+        body=json.dumps(
+            {
+                "message": f"Add album photo {saved_path.name}",
+                "content": encoded,
+                "branch": os.getenv("GITHUB_BRANCH", "main"),
+            }
+        ).encode("utf-8"),
+    )
+
+
 def save_uploaded_photos(uploaded_photos: list) -> list[Path]:
     ALBUM_DIR.mkdir(exist_ok=True)
     saved_photos = list(st.session_state.photos)
@@ -272,6 +354,8 @@ def save_uploaded_photos(uploaded_photos: list) -> list[Path]:
         suffix = Path(photo.name).suffix.lower()
         saved_path = ALBUM_DIR / f"{digest}{suffix}"
         if saved_path.name not in existing_names:
+            if github_token():
+                save_photo_to_github(saved_path, content)
             saved_path.write_bytes(content)
             saved_photos.append(saved_path)
             existing_names.add(saved_path.name)
@@ -466,10 +550,24 @@ def render_secret() -> None:
 def render_album() -> None:
     st.header("📷 Album kỷ niệm của chúng mình")
     st.caption("Thêm những khoảnh khắc khiến em mỉm cười nhé")
+    if st.session_state.get("album_storage_error"):
+        st.warning(
+            f"Album hiện chưa được lưu vĩnh viễn: {st.session_state.album_storage_error} "
+            "Hãy cấu hình GITHUB_TOKEN theo hướng dẫn trong README."
+        )
     uploaded = st.file_uploader("Thêm ảnh từ thiết bị", type=["png", "jpg", "jpeg", "gif", "bmp"], accept_multiple_files=True)
     if uploaded:
-        st.session_state.photos = save_uploaded_photos(uploaded)
-        st.success("Đã lưu ảnh vào album 💾")
+        try:
+            st.session_state.photos = save_uploaded_photos(uploaded)
+            st.session_state.album_storage_error = ""
+            st.success(
+                "Đã lưu ảnh vĩnh viễn vào GitHub 💾"
+                if github_token()
+                else "Đã lưu ảnh vào album tạm thời 💾"
+            )
+        except StorageError as error:
+            st.session_state.album_storage_error = str(error)
+            st.error(f"Không thể lưu ảnh: {error}")
     photos = st.session_state.photos
     if photos:
         st.success(f"Album đã có {len(photos)} ảnh kỷ niệm 💕")
