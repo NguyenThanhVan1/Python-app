@@ -1,7 +1,7 @@
 """Món quà 20/10 - phiên bản web Streamlit."""
 
 import base64
-from datetime import date
+from datetime import date, time
 import hashlib
 from html import escape
 from io import BytesIO
@@ -20,6 +20,8 @@ APP_DIR = Path(__file__).parent
 FEATURED_IMAGE = APP_DIR / "350a140c-676b-42d8-a6c1-d5bdfe03f5e3.jpg"
 ALBUM_DIR = APP_DIR / "album"
 GITHUB_ALBUM_API = "https://api.github.com/repos/NguyenThanhVan1/Python-app/contents/album"
+ALBUM_METADATA_NAME = "metadata.json"
+ALBUM_METADATA_PATH = ALBUM_DIR / ALBUM_METADATA_NAME
 DEFAULT_RECIPIENT = "em bé yêu"
 DEFAULT_SENDER = "anh"
 WEB_APP_URL = "https://python-app-yvizhlrbdgju5xsqc3wdwf.streamlit.app"
@@ -242,6 +244,7 @@ def initialize_state() -> None:
         "sender": DEFAULT_SENDER,
         "custom_message": DEFAULT_MESSAGE,
         "photos": [],
+        "photo_metadata": {},
         "gift_opened": False,
         "reason_index": 0,
         "secret_unlocked": False,
@@ -255,6 +258,7 @@ def initialize_state() -> None:
         except StorageError as error:
             st.session_state.album_storage_error = str(error)
         st.session_state.photos = local_album_photos()
+        st.session_state.photo_metadata = load_photo_metadata()
     if not st.session_state.gift_opened:
         st.session_state.page = "welcome"
 
@@ -278,6 +282,13 @@ def github_token() -> str:
     return token
 
 
+def github_setting(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+    return st.secrets.get(name, default)
+
+
 def github_request(url: str, method: str = "GET", **kwargs) -> dict | list:
     token = github_token()
     if not token:
@@ -291,12 +302,15 @@ def github_request(url: str, method: str = "GET", **kwargs) -> dict | list:
         "X-GitHub-Api-Version": "2022-11-28",
     }
     body = kwargs.get("body")
+    allow_not_found = kwargs.get("allow_not_found", False)
     request = Request(url, data=body, headers=headers, method=method)
     try:
         with urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8")) if response.length else {}
     except HTTPError as error:
-        if error.code == 404 and method == "GET" and url == GITHUB_ALBUM_API:
+        if error.code == 404 and (
+            (method == "GET" and url == GITHUB_ALBUM_API) or allow_not_found
+        ):
             return []
         raise StorageError(f"GitHub từ chối thao tác lưu album (HTTP {error.code}).") from error
     except URLError as error:
@@ -309,6 +323,44 @@ def local_album_photos() -> list[Path]:
         key=lambda photo: photo.stat().st_mtime,
         reverse=True,
     ) if ALBUM_DIR.exists() else []
+
+
+def load_photo_metadata() -> dict[str, dict[str, str]]:
+    if not ALBUM_METADATA_PATH.exists():
+        return {}
+    try:
+        metadata = json.loads(ALBUM_METADATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise StorageError("Không đọc được thông tin caption/thời gian của album.") from error
+    if not isinstance(metadata, dict):
+        raise StorageError("Dữ liệu caption/thời gian của album không hợp lệ.")
+    return {
+        name: {
+            "caption": str(values.get("caption", "")),
+            "date": str(values.get("date", "")),
+            "time": str(values.get("time", "")),
+        }
+        for name, values in metadata.items()
+        if isinstance(name, str) and isinstance(values, dict)
+    }
+
+
+def save_metadata_to_github(metadata: dict[str, dict[str, str]]) -> None:
+    content = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+    metadata_url = f"{GITHUB_ALBUM_API}/{ALBUM_METADATA_NAME}"
+    existing = github_request(metadata_url, allow_not_found=True)
+    payload = {
+        "message": "Update album photo metadata",
+        "content": base64.b64encode(content).decode("ascii"),
+        "branch": github_setting("GITHUB_BRANCH", "main"),
+    }
+    if isinstance(existing, dict) and existing.get("sha"):
+        payload["sha"] = existing["sha"]
+    github_request(
+        metadata_url,
+        method="PUT",
+        body=json.dumps(payload).encode("utf-8"),
+    )
 
 
 def sync_album_from_github() -> None:
@@ -324,9 +376,11 @@ def sync_album_from_github() -> None:
         content = github_request(entry["url"])
         if not isinstance(content, dict) or content.get("encoding") != "base64":
             raise StorageError(f"Không đọc được ảnh {entry['name']} từ GitHub.")
-        (ALBUM_DIR / entry["name"]).write_bytes(
-            base64.b64decode(content["content"].replace("\n", ""))
-        )
+        decoded = base64.b64decode(content["content"].replace("\n", ""))
+        if entry["name"] == ALBUM_METADATA_NAME:
+            ALBUM_METADATA_PATH.write_bytes(decoded)
+        else:
+            (ALBUM_DIR / entry["name"]).write_bytes(decoded)
 
 
 def save_photo_to_github(saved_path: Path, content: bytes) -> None:
@@ -338,13 +392,33 @@ def save_photo_to_github(saved_path: Path, content: bytes) -> None:
             {
                 "message": f"Add album photo {saved_path.name}",
                 "content": encoded,
-                "branch": os.getenv("GITHUB_BRANCH", "main"),
+                "branch": github_setting("GITHUB_BRANCH", "main"),
             }
         ).encode("utf-8"),
     )
 
 
-def save_uploaded_photos(uploaded_photos: list) -> list[Path]:
+def delete_photo_from_github(photo: Path) -> None:
+    remote_photo = github_request(f"{GITHUB_ALBUM_API}/{photo.name}")
+    if not isinstance(remote_photo, dict) or not remote_photo.get("sha"):
+        raise StorageError(f"Không tìm thấy ảnh {photo.name} trên GitHub để xóa.")
+    github_request(
+        f"{GITHUB_ALBUM_API}/{photo.name}",
+        method="DELETE",
+        body=json.dumps(
+            {
+                "message": f"Delete album photo {photo.name}",
+                "sha": remote_photo["sha"],
+                "branch": github_setting("GITHUB_BRANCH", "main"),
+            }
+        ).encode("utf-8"),
+    )
+
+
+def save_uploaded_photos(
+    uploaded_photos: list,
+    metadata: dict[str, dict[str, str]],
+) -> list[Path]:
     ALBUM_DIR.mkdir(exist_ok=True)
     saved_photos = list(st.session_state.photos)
     existing_names = {photo.name for photo in saved_photos if isinstance(photo, Path)}
@@ -359,7 +433,32 @@ def save_uploaded_photos(uploaded_photos: list) -> list[Path]:
             saved_path.write_bytes(content)
             saved_photos.append(saved_path)
             existing_names.add(saved_path.name)
+        metadata[saved_path.name] = metadata.get(photo.name, metadata.get(saved_path.name, {}))
+        if photo.name != saved_path.name:
+            metadata.pop(photo.name, None)
+    ALBUM_METADATA_PATH.write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    if github_token():
+        save_metadata_to_github(metadata)
     return saved_photos
+
+
+def delete_photo(photo: Path) -> None:
+    if github_token():
+        delete_photo_from_github(photo)
+    try:
+        photo.unlink()
+    except OSError as error:
+        raise StorageError(f"Không thể xóa ảnh {photo.name} khỏi album.") from error
+    st.session_state.photo_metadata.pop(photo.name, None)
+    ALBUM_METADATA_PATH.write_text(
+        json.dumps(st.session_state.photo_metadata, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    if github_token():
+        save_metadata_to_github(st.session_state.photo_metadata)
 
 
 def letter_text() -> str:
@@ -557,24 +656,77 @@ def render_album() -> None:
         )
     uploaded = st.file_uploader("Thêm ảnh từ thiết bị", type=["png", "jpg", "jpeg", "gif", "bmp"], accept_multiple_files=True)
     if uploaded:
-        try:
-            st.session_state.photos = save_uploaded_photos(uploaded)
-            st.session_state.album_storage_error = ""
-            st.success(
-                "Đã lưu ảnh vĩnh viễn vào GitHub 💾"
-                if github_token()
-                else "Đã lưu ảnh vào album tạm thời 💾"
+        pending_metadata = dict(st.session_state.photo_metadata)
+        with st.form("photo_details_form"):
+            st.subheader("Thông tin ảnh")
+            for photo in uploaded:
+                current = pending_metadata.get(photo.name, {})
+                caption = st.text_input(
+                    f"Caption cho {photo.name}",
+                    value=current.get("caption", ""),
+                    key=f"caption_{photo.name}",
+                )
+                photo_date = st.date_input(
+                    f"Thời gian của {photo.name}",
+                    value=date.fromisoformat(current["date"])
+                    if current.get("date")
+                    else date.today(),
+                    key=f"date_{photo.name}",
+                )
+                photo_time = st.time_input(
+                    f"Giờ của {photo.name}",
+                    value=time.fromisoformat(current["time"])
+                    if current.get("time")
+                    else time(0, 0),
+                    key=f"time_{photo.name}",
+                )
+                pending_metadata[photo.name] = {
+                    "caption": caption.strip(),
+                    "date": photo_date.isoformat(),
+                    "time": photo_time.strftime("%H:%M"),
+                }
+            save_details = st.form_submit_button(
+                "💾 Lưu ảnh và thông tin", use_container_width=True
             )
-        except StorageError as error:
-            st.session_state.album_storage_error = str(error)
-            st.error(f"Không thể lưu ảnh: {error}")
+        if save_details:
+            try:
+                st.session_state.photos = save_uploaded_photos(
+                    uploaded, pending_metadata
+                )
+                st.session_state.photo_metadata = {
+                    photo.name: pending_metadata.get(photo.name, {})
+                    for photo in st.session_state.photos
+                }
+                st.session_state.album_storage_error = ""
+                st.success(
+                    "Đã lưu ảnh "
+                    if github_token()
+                    else "Đã lưu ảnh và thông tin vào album tạm thời 💾"
+                )
+            except StorageError as error:
+                st.session_state.album_storage_error = str(error)
+                st.error(f"Không thể lưu album: {error}")
     photos = st.session_state.photos
     if photos:
         st.success(f"Album đã có {len(photos)} ảnh kỷ niệm 💕")
         columns = st.columns(min(3, len(photos)))
         for index, photo in enumerate(photos):
             with columns[index % len(columns)]:
-                st.image(photo, caption=photo.name, use_container_width=True)
+                metadata = st.session_state.photo_metadata.get(photo.name, {})
+                caption = metadata.get("caption") or photo.name
+                st.image(photo, caption=caption, use_container_width=True)
+                if metadata.get("date"):
+                    photo_time = metadata.get("time")
+                    time_label = f" {photo_time}" if photo_time else ""
+                    st.caption(f"🗓️ {metadata['date']}{time_label}")
+                if st.button("🗑️ Xóa ảnh", key=f"delete_{photo.name}", use_container_width=True):
+                    try:
+                        delete_photo(photo)
+                        st.session_state.photos.remove(photo)
+                        st.success("Đã xóa ảnh khỏi album.")
+                        st.rerun()
+                    except StorageError as error:
+                        st.error(f"Không thể xóa ảnh: {error}")
     else:
         st.info("Album đang chờ những kỷ niệm của chúng mình 🌷")
     first, second = st.columns(2)
