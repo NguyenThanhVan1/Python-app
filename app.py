@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 import qrcode
 import streamlit as st
+from PIL import Image, UnidentifiedImageError
 
 
 APP_DIR = Path(__file__).parent
@@ -319,10 +320,25 @@ def github_request(url: str, method: str = "GET", **kwargs) -> dict | list:
 
 def local_album_photos() -> list[Path]:
     return sorted(
-        (photo for photo in ALBUM_DIR.glob("*") if photo.is_file()),
+        (
+            photo
+            for photo in ALBUM_DIR.glob("*")
+            if photo.is_file()
+            and photo.name != ALBUM_METADATA_NAME
+            and is_image_file(photo)
+        ),
         key=lambda photo: photo.stat().st_mtime,
         reverse=True,
     ) if ALBUM_DIR.exists() else []
+
+
+def is_image_file(photo: Path) -> bool:
+    try:
+        with Image.open(photo) as image:
+            image.verify()
+    except (OSError, UnidentifiedImageError):
+        return False
+    return True
 
 
 def load_photo_metadata() -> dict[str, dict[str, str]]:
